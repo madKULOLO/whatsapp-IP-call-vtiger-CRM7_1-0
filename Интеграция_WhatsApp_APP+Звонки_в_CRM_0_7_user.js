@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Интеграция WhatsApp APP+Звонки в CRM
 // @namespace    http://tampermonkey.net/
-// @version      0.7
+// @version      0.8
 // @description  Добавляет ссылки WhatsApp рядом с номерами телефонов в CRM, открывая десктопное приложение или веб-версию
 // @author       madKULOLO
 // @match        http://crm.local/*
@@ -21,15 +21,9 @@
         return cleaned;
     }
 
-    // Функция для создания ссылки WhatsApp (десктоп или веб-версия)
     function createWhatsAppLink(phone) {
         const normalized = normalizePhoneNumber(phone);
-        // Раскомментируй следующую строку для использования веб-версии WhatsApp
-        // return `https://web.whatsapp.com/send?phone=${normalized}`;
-        // Текущая настройка: открытие десктопного приложения WhatsApp
         return `whatsapp://send?phone=${normalized}`;
-        // Альтернативная веб-версия через API (если нужно)
-        // return `https://api.whatsapp.com/send?phone=${normalized}`;
     }
 
     function createWhatsAppIcon(phone, recordId) {
@@ -44,11 +38,6 @@
 
         icon.addEventListener('click', function(event) {
             event.preventDefault();
-            // Раскомментируй следующий блок и закомментируй "window.location" для веб-версии
-            /*
-            window.open(link, '_blank');
-            */
-            // Текущая настройка: открытие десктопного приложения
             window.location = link;
         });
 
@@ -72,8 +61,12 @@
     }
 
     function findPhoneNumbersInText() {
-        const mobileRegex = /(?<!\d)(?:\+7|7|8)[\s-]*\(?(9\d{2})\)?[\s-]*(?:\d{2,3})[\s-]*(?:\d{2})[\s-]*(?:\d{2,3})(?!\d|[^@]*@)/g;
-        const landlineRegex = /(?<!\d)(?:\+7|8)[\s-]*\(?([0-8]\d{2,4})\)?[\s-]*(\d{1,3})[\s-]*(\d{1,3})[\s-]*(\d{1,3})(?!\d|[^@]*@)/g;
+        // Обновленное регулярное выражение для мобильных номеров (строго +7/7/8, затем 9 и 9 цифр)
+        const mobileRegex = /(?<!\d)(?:\+7|7|8)\s*\(?(9\d{2})\)?\s*(?:\d{3})\s*(?:\d{2})\s*(?:\d{2})(?!\d)/g;
+        // Обновленное регулярное выражение для стационарных номеров (3-5 цифр кода, 5-7 цифр номера)
+        const landlineRegex = /(?<!\d)(?:\+7|8)\s*\(?(?:[1-8]\d{2,4})\)?\s*(?:\d{2,3})\s*(?:\d{2})\s*(?:\d{2,3})(?!\d)/g;
+        // Регулярное выражение для исключения IMEI (15 цифр)
+        const imeiRegex = /\b\d{15}\b/g;
 
         const walker = document.createTreeWalker(
             document.body,
@@ -97,7 +90,9 @@
         const nodesToProcess = [];
         let node;
         while (node = walker.nextNode()) {
-            if ((mobileRegex.test(node.textContent) || landlineRegex.test(node.textContent)) && !node.parentNode.querySelector('.whatsapp-icon')) {
+            const text = node.textContent;
+            // Проверяем, что текст содержит телефонный номер, но не IMEI
+            if ((mobileRegex.test(text) || landlineRegex.test(text)) && !imeiRegex.test(text.replace(/[^0-9]/g, ''))) {
                 nodesToProcess.push(node);
             }
         }
@@ -108,16 +103,7 @@
 
             html = html.replace(mobileRegex, (match) => {
                 const cleanedPhone = normalizePhoneNumber(match);
-                const formattedPhone = match.replace(/(\+7|7|8)[\s-]*\(?(9\d{2})\)?[\s-]*(\d{2,3})[\s-]*(\d{2})[\s-]*(\d{2,3})/, '$1-$2-$3-$4-$5');
-
-                // Раскомментируй следующий блок и закомментируй текущий для веб-версии (открытие в новой вкладке)
-                /*
-                return `<a class="phoneField" data-value="${cleanedPhone}" record="0" ` +
-                       `onclick="Vtiger_PBXManager_Js.registerPBXOutboundCall('${cleanedPhone}',0)" data-wa-processed="true">${formattedPhone}</a>` +
-                       `<a href="${createWhatsAppLink(cleanedPhone)}" class="whatsapp-icon" target="_blank" style="margin-left:5px;display:inline-block;">` +
-                       `<img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" width="16" height="16" style="filter: grayscale(100%);"></a>`;
-                */
-                // Текущая настройка: открытие десктопного приложения
+                const formattedPhone = match.replace(/(\+7|7|8)\s*\(?(9\d{2})\)?\s*(\d{3})\s*(\d{2})\s*(\d{2})/, '$1-$2-$3-$4-$5');
                 return `<a class="phoneField" data-value="${cleanedPhone}" record="0" ` +
                        `onclick="Vtiger_PBXManager_Js.registerPBXOutboundCall('${cleanedPhone}',0)" data-wa-processed="true">${formattedPhone}</a>` +
                        `<a href="${createWhatsAppLink(cleanedPhone)}" class="whatsapp-icon" style="margin-left:5px;display:inline-block;">` +
@@ -126,8 +112,7 @@
 
             html = html.replace(landlineRegex, (match) => {
                 const cleanedPhone = normalizePhoneNumber(match);
-                const formattedPhone = match.replace(/(\+7|8)[\s-]*\(?([0-8]\d{2,4})\)?[\s-]*(\d{1,3})[\s-]*(\d{1,3})[\s-]*(\d{1,3})/, '$1-$2-$3-$4-$5');
-
+                const formattedPhone = match.replace(/(\+7|8)\s*\(?(?:[1-8]\d{2,4})\)?\s*(\d{2,3})\s*(\d{2})\s*(\d{2,3})/, '$1-$2-$3-$4');
                 return `<a class="phoneField" data-value="${cleanedPhone}" record="0" ` +
                        `onclick="Vtiger_PBXManager_Js.registerPBXOutboundCall('${cleanedPhone}',0)" data-wa-processed="true">${formattedPhone}</a>`;
             });
