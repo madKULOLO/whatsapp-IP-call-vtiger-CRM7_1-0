@@ -18,7 +18,7 @@ Tampermonkey-скрипт, который добавляет иконку WhatsA
 1. Установите [Tampermonkey](https://www.tampermonkey.net/) (если ещё не установлен).
 2. Включите [режим разработчика Tampermonkey](https://www.tampermonkey.net/faq.php#Q209) 
 3. Нажмите «Создать новый скрипт» в панели Tampermonkey.
-4. Вставьте содержимое скрипта из `whatsapp-crm.user.js`.
+4. Вставьте содержимое скрипта из `Интеграция_WhatsApp_APP+Звонки_в_CRM_0_7_user.js`.
 5. Сохраните скрипт.
 6. Убедитесь, что сайт `http://crm.local` соответствует настройке `@match` или измените `@match` под свой домен CRM.
 
